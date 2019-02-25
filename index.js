@@ -6,7 +6,7 @@ const AWS = require('aws-sdk');
 const _ = require('lodash');
 
 const s3Conf = {
-	... require('./secret.json'),
+	...require('./secret.json'),
 	acl: 'public-read',
 };
 
@@ -36,35 +36,35 @@ async function saveToFileSystem(fileStream, index) {
 
 async function saveToS3(fileStream, index) {
 	return await new Promise((resolve, reject) => {
-			const s3 = new AWS.S3();
-			fileStream.on('error', (err) => {
-				this.logger.error(`Error while sending to S3`, { path });
-				reject(err);
-			});
+		const s3 = new AWS.S3();
+		fileStream.on('error', (err) => {
+			this.logger.error(`Error while sending to S3`, { path });
+			reject(err);
+		});
 
-			const params = {
-				Bucket: s3Conf.bucketName,
-				ACL: s3Conf.acl,
-				Key: 'mem-test/' + index + '.jpg',
-				ContentType: 'image/jpeg',
-				Body: fileStream,
-			};
+		const params = {
+			Bucket: s3Conf.bucketName,
+			ACL: s3Conf.acl,
+			Key: 'mem-test/' + index + '.jpg',
+			ContentType: 'image/jpeg',
+			Body: fileStream,
+		};
 
-			const managedUpload = s3.upload(params, {
-				queueSize: 1,
-				partSize: 5 * 1024 * 1024,
-			});
-			let size = 0;
+		const managedUpload = s3.upload(params, {
+			queueSize: 1,
+			partSize: 5 * 1024 * 1024,
+		});
+		let size = 0;
 
-			managedUpload.on('httpUploadProgress', (progress) => {
-				// console.log(`-- upload progress  --`, progress);
-				if (progress.total) size = progress.total;
-			});
+		managedUpload.on('httpUploadProgress', (progress) => {
+			// console.log(`-- upload progress  --`, progress);
+			if (progress.total) size = progress.total;
+		});
 
-			managedUpload.send((err, data) => {
-				if (err) reject(err);
-				else resolve({ size, hash: data.ETag.replace(/[^a-z0-9A-Z]/g, '') });
-			});
+		managedUpload.send((err, data) => {
+			if (err) reject(err);
+			else resolve({ size, hash: data.ETag.replace(/[^a-z0-9A-Z]/g, '') });
+		});
 	});
 }
 
@@ -73,17 +73,17 @@ async function launchUpload(storageType) {
 		concurrencyLimit: 100,
 	});
 
-	console.log(`--------------------------------`)
+	console.log(`--------------------------------`);
 	console.log(`Start upload to ${storageType} !`);
-	console.log(`--------------------------------`)
+	console.log(`--------------------------------`);
 	await pool.addEachTask({
 		data: Array(100),
 		generator: async (v, index) => {
 			const fileStream = fs.createReadStream('media-sample.jpg');
 
 			let uploadResult;
-			if(storageType === 'fs') uploadResult = await saveToFileSystem(fileStream);
-			else if(storageType === 's3') uploadResult = await saveToS3(fileStream);
+			if (storageType === 'fs') uploadResult = await saveToFileSystem(fileStream);
+			else if (storageType === 's3') uploadResult = await saveToS3(fileStream);
 			else throw new Error('unknown-storage-type');
 
 			// printRAMUsage();
@@ -114,8 +114,9 @@ function printRAMUsage() {
 	printRAMUsage();
 	await launchUpload('s3');
 	printRAMUsage();
-})().then(() => {
+})()
+		.then(() => {
 			console.log(`DONE`);
 			process.exit(0);
 		})
-		.catch((error) => console.log(`END WITH ERROR `, error))
+		.catch((error) => console.log(`END WITH ERROR `, error));
