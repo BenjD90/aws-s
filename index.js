@@ -1,12 +1,11 @@
-const PromisePool = require('promise-pool-executor');
 const fs = require('fs');
 const path = require('path');
 const stream = require('stream');
 const AWS = require('aws-sdk');
-const _ = require('lodash');
+const mapValues = require('lodash.mapvalues');
 
 const s3Conf = {
-	... require('./secret.json'),
+	...require('./secret.json'),
 	acl: 'public-read',
 };
 
@@ -36,69 +35,67 @@ async function saveToFileSystem(fileStream, index) {
 
 async function saveToS3(fileStream, index) {
 	return await new Promise((resolve, reject) => {
-			const s3 = new AWS.S3();
-			fileStream.on('error', (err) => {
-				this.logger.error(`Error while sending to S3`, { path });
-				reject(err);
-			});
+		const s3 = new AWS.S3();
+		fileStream.on('error', (err) => {
+			this.logger.error(`Error while sending to S3`, { path });
+			reject(err);
+		});
 
-			const params = {
-				Bucket: s3Conf.bucketName,
-				ACL: s3Conf.acl,
-				Key: 'mem-test/' + index + '.jpg',
-				ContentType: 'image/jpeg',
-				Body: fileStream,
-			};
+		const params = {
+			Bucket: s3Conf.bucketName,
+			ACL: s3Conf.acl,
+			Key: 'mem-test/' + index + '.jpg',
+			ContentType: 'image/jpeg',
+			Body: fileStream,
+		};
 
-			const managedUpload = s3.upload(params, {
-				queueSize: 1,
-				partSize: 5 * 1024 * 1024,
-			});
-			let size = 0;
+		const managedUpload = s3.upload(params, {
+			queueSize: 1,
+			partSize: 5 * 1024 * 1024,
+		});
+		let size = 0;
 
-			managedUpload.on('httpUploadProgress', (progress) => {
-				// console.log(`-- upload progress  --`, progress);
-				if (progress.total) size = progress.total;
-			});
+		managedUpload.on('httpUploadProgress', (progress) => {
+			// console.log(`-- upload progress  --`, progress);
+			if (progress.total) size = progress.total;
+		});
 
-			managedUpload.send((err, data) => {
-				if (err) reject(err);
-				else resolve({ size, hash: data.ETag.replace(/[^a-z0-9A-Z]/g, '') });
-			});
+		managedUpload.send((err, data) => {
+			if (err) reject(err);
+			else resolve({ size, hash: data.ETag.replace(/[^a-z0-9A-Z]/g, '') });
+		});
 	});
 }
 
 async function launchUpload(storageType) {
-	const pool = new PromisePool.PromisePoolExecutor({
-		concurrencyLimit: 100,
-	});
-
-	console.log(`--------------------------------`)
+	const startTime = Date.now();
+	console.log(`--------------------------------`);
 	console.log(`Start upload to ${storageType} !`);
-	console.log(`--------------------------------`)
-	await pool.addEachTask({
-		data: Array(100),
-		generator: async (v, index) => {
-			const fileStream = fs.createReadStream('media-sample.jpg');
+	console.log(`--------------------------------`);
 
-			let uploadResult;
-			if(storageType === 'fs') uploadResult = await saveToFileSystem(fileStream);
-			else if(storageType === 's3') uploadResult = await saveToS3(fileStream);
-			else throw new Error('unknown-storage-type');
+	await Promise.all(
+			Array(100)
+					.fill(0)
+					.map(async (v, index) => {
+						const fileStream = fs.createReadStream('media-sample.jpg');
 
-			// printRAMUsage();
-			// console.log(`DONE ${index} size: ${uploadResult.size} hash : ${uploadResult.hash}`);
+						let uploadResult;
+						if (storageType === 'fs') uploadResult = await saveToFileSystem(fileStream);
+						else if (storageType === 's3') uploadResult = await saveToS3(fileStream);
+						else throw new Error('unknown-storage-type');
 
-		}
-	}).promise();
+						// printRAMUsage();
+						// console.log(`DONE ${index} size: ${uploadResult.size} hash : ${uploadResult.hash}`);
+					})
+	);
 
 
-	console.log(`END upload to ${storageType} !`);
+	console.log(`END upload to ${storageType} in ${Date.now() - startTime} ms`);
 }
 
 
 function printRAMUsage() {
-	const memoryUsage = _.mapValues(process.memoryUsage(), (v) => (Math.round((v * 10) / (1024 * 1024)) / 10).toLocaleString().padStart(7));
+	const memoryUsage = mapValues(process.memoryUsage(), (v) => (Math.round((v * 10) / (1024 * 1024)) / 10).toLocaleString().padStart(7));
 	console.log(`RAM usage :`, `Heap : ${memoryUsage.heapUsed}/${memoryUsage.heapTotal} Mo rss : ${memoryUsage.rss} Mo external : ${memoryUsage.external} Mo`);
 }
 
@@ -114,7 +111,8 @@ function printRAMUsage() {
 	printRAMUsage();
 	await launchUpload('s3');
 	printRAMUsage();
-})().then(() => {
+})()
+		.then(() => {
 			console.log(`DONE`);
 			process.exit(0);
 		})

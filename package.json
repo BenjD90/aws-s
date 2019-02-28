@@ -1,7 +1,6 @@
 {
   "dependencies": {
     "aws-sdk": "^2.409.0",
-    "lodash": "^4.17.11",
-    "promise-pool-executor": "^1.1.1"
+    "lodash.mapvalues": "^4.6.0"
   }
 }
